@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- client_app.html -->
+  	<title>睡眠時間ポータル</title>
+  
+    <meta charset="UTF-8" />
+    <meta name="viewport" id="id_viewport" content="width=device-width" >
+    <link rel="apple-touch-icon-precomposed" href="./images/if_Chart_2431362.png" />
+    <!-- ブックマークされた際のアイコン指定。
+    設定方法 ref. http://www.adobe.com/jp/devnet/dreamweaver/articles/smartphone_web_part3.html
+    利用アイコン ref. https://www.iconfinder.com/icons/2431362/chart_goal_graph_sales_icon#size=128
+     -->
+
+    <!-- Font Awesome を利用 -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous"></link>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome-animation/0.0.10/font-awesome-animation.css" type="text/css" media="all"></link>
+
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.1.4/Chart.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.4.2/vue.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.16.2/axios.min.js"></script>
+
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+    <script src="./javascripts/jq_ui_panel.js"></script>
+    <script>
+      $(document).ready(function(){
+        bindExpandCollapsePanel( "id_ctrl_panel" );
+      });
+    </script>
+
+    <script src="./brw_lib/tiny-cookie.js"></script>
+    <script src="./javascripts/manage_account.js"></script>
+    <script src="./javascripts/chart_sleeping.js"></script>
+    <script src="./javascripts/vue_client.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="./stylesheets/client_app.css">
+    <!-- component template -->
+    <script type="text/x-template" id="grid-template">
+      <table>
+        <thead>
+          <tr>
+            <!--
+            <th v-for="key in columns"
+              @click="sortBy(key)"
+              :class="{ active: sortKey == key }">
+              {{ key | capitalize }}
+              <span class="arrow" :class="sortOrders[key] > 0 ? 'asc' : 'dsc'">
+              </span>
+            </th>
+            -->
+            <th v-for="key in columns">
+              {{ key | capitalize }}
+            </th>
+        </tr>
+        </thead>
+        <tbody>
+          <tr v-for="entry in filteredData">
+            <td v-for="key in columns">
+              {{entry[key]}}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </script>
+  </head>
+  <body>
+    <div id="id_ctrl_panel">
+      <!-- このブロックは丸ごとjQueryで表示／非表示を管理する。 -->
+      <div id="app_setup">
+				<!-- 
+				◆Font Awesome◆
+				楽して便利！Webアイコンフォント『Font Awesome』の使い方と活用 Tips
+				https://h2ham.net/font-awasome
+				https://web-bruno.com/font-awesome-icon-font/
+				→loadingのヤツ解説されてる。
+				
+				アイコンをWebフォントで表示！ Font Awesomeの使い方
+				→Ie7でも使えるらしい。
+				https://allabout.co.jp/gm/gc/402551/2/
+				 -->
+        ユーザーID：
+        <i v-if="userNameIsValid" class="fa fa-check" style="color:#4444ff"></i>
+				<span class="error_text" v-if="!userNameIsValid">有効なメールアドレスを入力してください</span><br>
+        <input id="id_username" v-model="userName"><br>
+
+        パスワード：
+        <i v-if="passKeyIsValid" class="fa fa-check" style="color:#4444ff"></i>
+				<span class="error_text" v-if="!passKeyIsValid">8文字以上のパスワードを入力してください</span><br>
+        <input id="id_passkeyword" type="password" v-model="passKeyWord"><br>
+        <input v-show="userNameIsValid && passKeyIsValid" value="登録" type="button" v-on:click="createAccount">
+        <br><br>
+      </div>
+    </div>
+    <hr>
+    <!-- grid-view element -->
+    <div id="app_grid">
+      <div>
+        <a v-on:click="noticeGotUp" class="square_btn" href="javascript:void(0);">
+          {{TEXT_GETUP}}
+        </a>
+        <a v-on:click="noticeGotoBed" class="square_btn" href="javascript:void(0);">
+          {{TEST_GOTOBED}}
+        </a>
+        <a v-show="isRefreshDataIcon" v-on:click="refreshData" href="javascript:void(0);">
+          <i class="fa fa-refresh fa-2x" style="color:#4444ff"></i>
+        </a>
+        <!-- 
+          ※faa-flashクラスは、font awesome本体ではなく、追加のawesom animateを利用している。
+          https://saruwakakun.com/html-css/basic/font-awesome#section6
+        -->
+        <i v-show="isShowUploadingIcon" class="fa fa-cloud-upload faa-flash animated fa-2x"></i>
+      </div>
+      <div>
+        <!-- 
+        <form id="search">
+          Search <input name="query" v-model="searchQuery">
+        </form>
+        <vue-my-element-grid
+          :data="gridData"
+          :columns="gridColumns"
+          :filter-key="searchQuery">
+        </vue-my-element-grid>
+        -->
+        <vue-my-element-grid
+          :data="gridData"
+          :columns="gridColumns">
+        </vue-my-element-grid>
+      </div>
+      <!-- 
+        スタイル属性の動的なVue.js反映は下記参照（公式）。
+        https://jp.vuejs.org/v2/guide/class-and-style.html
+      -->
+      <div v-bind:style="lodingSpinnerDivStyle">
+        <i class="fa fa-spinner fa-spin fa-3x"></i> loading....
+      </div>
+      <div>
+        <!-- 
+          ここの一覧からチャートアイコンを拾った。
+          https://nj-clucker.com/search-font-awesome-icon-by-japanese/
+        -->
+        <a v-on:click="setChartStyleBar" href="javascript:void(0);">
+          <i class="fa fa-bar-chart fa-2x" v-bind:style="chartIconColorBar"></i>
+        </a>
+        <a v-on:click="setChartStyleLine" href="javascript:void(0);">
+          <i class="fa fa-line-chart fa-2x" v-bind:style="chartIconColorLine"></i>
+        </a>
+      </div>
+
+    </div>
+    <div>
+      <canvas id="id_chart" style="width: 100%"></canvas>
+    </div>
+    <br><br><br>
+  </body>
+</html>
+
+
+
+
